@@ -5,7 +5,7 @@ import { AiOutlineLeft } from "react-icons/ai";
 import RichTextEditor from "../components/RichTextEditor";
 import { usePostStore } from "../store/postStore";
 import "../styles/editor.css";
-import "../styles/rich-text-editor.css"; // Add this import
+import "../styles/rich-text-editor.css";
 
 export default function Editor() {
   const { id } = useParams();
@@ -19,23 +19,28 @@ export default function Editor() {
   const [draftStatus, setDraftStatus] = useState("New");
   const [content, setContent] = useState("");
 
-  // Cover upload
-  const handleCoverUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setCover(url);
-      setDraftStatus("Saving...");
-      handleSave(content, url);
-    }
-  };
+  // Defensive: wait for posts to load if editing
+  const post = id ? posts.find((p) => p.id === id) : null;
+  if (id && !post) {
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <h2>Loading post...</h2>
+        <p>Please wait or go back to the Home page.</p>
+      </div>
+    );
+  }
 
-  // Save function
+  // Save
   const handleSave = useCallback(
     (contentToSave = content, featuredImage = cover) => {
       const now = new Date().toISOString();
       if (id) {
-        updatePost(id, { title, content: contentToSave, featuredImage, updatedAt: now });
+        updatePost(id, {
+          title,
+          content: contentToSave,
+          featuredImage,
+          updatedAt: now,
+        });
       } else {
         const newPost = {
           id: Date.now().toString(),
@@ -53,18 +58,26 @@ export default function Editor() {
     [id, title, content, cover, addPost, updatePost, navigate]
   );
 
-  // Load post if editing
+  // Load post data
   useEffect(() => {
-    if (id) {
-      const p = posts.find((x) => x.id === id);
-      if (p) {
-        setTitle(p.title || "");
-        setContent(p.content || "");
-        setDraftStatus("Saved");
-        setCover(p.featuredImage || null);
-      }
+    if (post) {
+      setTitle(post.title || "");
+      setContent(post.content || "");
+      setDraftStatus("Saved");
+      setCover(post.featuredImage || null);
     }
-  }, [id, posts]);
+  }, [post]);
+
+  // Cover upload
+  const handleCoverUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setCover(url);
+      setDraftStatus("Saving...");
+      handleSave(content, url);
+    }
+  };
 
   return (
     <div className="editor-container container">
@@ -85,9 +98,16 @@ export default function Editor() {
       </div>
 
       {/* Cover */}
-      <div className="cover-upload-placeholder" onClick={() => document.getElementById("coverInput").click()}>
+      <div
+        className="cover-upload-placeholder"
+        onClick={() => document.getElementById("coverInput").click()}
+      >
         {cover ? (
-          <img src={cover} alt="Cover" style={{ width: "100%", borderRadius: 8 }} />
+          <img
+            src={cover}
+            alt="Cover"
+            style={{ width: "100%", borderRadius: 8 }}
+          />
         ) : (
           <>
             <p>Click to upload post cover or drag and drop</p>

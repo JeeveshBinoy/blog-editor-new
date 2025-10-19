@@ -12,6 +12,8 @@ export default function Home() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
+  console.log('Home component rendered, posts count:', posts.length);
+
   const filteredPosts = posts.filter((post) =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -34,13 +36,20 @@ export default function Home() {
     }
   };
 
-  // FIXED: Remove { replace: true } from navigation
   const handleEditPost = (postId) => {
+    console.log('Edit post clicked:', postId);
     navigate(`/editor/${postId}`);
   };
 
   const handleNewPost = () => {
+    console.log('New post clicked');
     navigate("/editor");
+  };
+
+  const handleDeletePost = (postId) => {
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      deletePost(postId);
+    }
   };
 
   return (
@@ -107,7 +116,7 @@ export default function Home() {
                   </button>
                   <button 
                     className="delete-button"
-                    onClick={() => deletePost(post.id)}
+                    onClick={() => handleDeletePost(post.id)}
                   >
                     <FiTrash2 className="delete-icon" />
                   </button>
