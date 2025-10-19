@@ -12,13 +12,10 @@ export default function Home() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
 
-  console.log('Home component rendered, posts count:', posts.length);
-
   const filteredPosts = posts.filter((post) =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Exact time formatting from screenshot
   const formatTimeDisplay = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -36,8 +33,9 @@ export default function Home() {
     }
   };
 
+  // FIXED: Simple navigation functions
   const handleEditPost = (postId) => {
-    console.log('Edit post clicked:', postId);
+    console.log('Edit post clicked, postId:', postId);
     navigate(`/editor/${postId}`);
   };
 

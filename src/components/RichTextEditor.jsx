@@ -1,4 +1,4 @@
-// src/components/RichTextEditor.jsx
+// src/components/RichTextEditor.jsx - FIXED VERSION
 import React, { useEffect, useState, useRef } from "react";
 import { EditorContent, useEditor, ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -196,10 +196,16 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
   const [activeLineTop, setActiveLineTop] = useState(null);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
   const [hasHoveredEditor, setHasHoveredEditor] = useState(false);
+  const [editorError, setEditorError] = useState(null);
   const containerRef = useRef(null);
   const plusButtonRef = useRef(null);
   const saveTimeout = useRef(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // FIX: Provide safe default content for new posts
+  const safeInitialContent = initialContent || '<p></p>';
+
+  console.log('RichTextEditor mounted with content:', safeInitialContent ? 'has content' : 'empty');
 
   const editor = useEditor({
     extensions: [
@@ -217,16 +223,28 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
       DividerNode,
       TwitterNode,
     ],
-    content: initialContent,
+    content: safeInitialContent,
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      onChange?.(html);
-      setIsSaving(true);
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-      saveTimeout.current = setTimeout(() => {
-        onSaved?.(html);
-        setIsSaving(false);
-      }, 1000);
+      try {
+        const html = editor.getHTML();
+        onChange?.(html);
+        setIsSaving(true);
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        saveTimeout.current = setTimeout(() => {
+          onSaved?.(html);
+          setIsSaving(false);
+        }, 1000);
+      } catch (error) {
+        console.error('Editor update error:', error);
+        setEditorError(error.message);
+      }
+    },
+    onCreate: () => {
+      console.log('Editor created successfully');
+      setEditorError(null);
+    },
+    onDestroy: () => {
+      console.log('Editor destroyed');
     }
   });
 
@@ -234,36 +252,53 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
     if (!editor) return;
     
     const update = () => {
-      const sel = editor.state.selection;
-      const dom = editor.view.domAtPos(sel.from).node;
-      
-      if (dom && dom.parentNode) {
-        const paragraph = dom.tagName === "P" ? dom : dom.closest("p");
-        if (paragraph && paragraph.innerText.trim() === "" && hasHoveredEditor) {
-          const editorDom = containerRef.current;
-          const lineRect = paragraph.getBoundingClientRect();
-          const editorRect = editorDom.getBoundingClientRect();
-          setActiveLineTop(lineRect.top - editorRect.top + editorDom.scrollTop);
-          setShowPlus(true);
-          return;
+      try {
+        const sel = editor.state.selection;
+        const dom = editor.view.domAtPos(sel.from).node;
+        
+        if (dom && dom.parentNode) {
+          const paragraph = dom.tagName === "P" ? dom : dom.closest("p");
+          if (paragraph && paragraph.innerText.trim() === "" && hasHoveredEditor) {
+            const editorDom = containerRef.current;
+            if (editorDom) {
+              const lineRect = paragraph.getBoundingClientRect();
+              const editorRect = editorDom.getBoundingClientRect();
+              setActiveLineTop(lineRect.top - editorRect.top + editorDom.scrollTop);
+              setShowPlus(true);
+              return;
+            }
+          }
         }
+        setShowPlus(false);
+      } catch (error) {
+        console.error('Plus button positioning error:', error);
+        setShowPlus(false);
       }
-      setShowPlus(false);
     };
 
     const view = editor.view;
     const observer = () => update();
     
-    ["keyup", "click", "input", "scroll"].forEach(e => 
-      view.dom.addEventListener(e, observer)
-    );
+    // FIX: Use safer event listeners
+    const events = ["keyup", "click", "input", "scroll"];
+    events.forEach(e => {
+      try {
+        view.dom.addEventListener(e, observer);
+      } catch (error) {
+        console.error(`Error adding ${e} listener:`, error);
+      }
+    });
     
     update();
     
     return () => {
-      ["keyup", "click", "input", "scroll"].forEach(e => 
-        view.dom.removeEventListener(e, observer)
-      );
+      events.forEach(e => {
+        try {
+          view.dom.removeEventListener(e, observer);
+        } catch (error) {
+          console.error(`Error removing ${e} listener:`, error);
+        }
+      });
     };
   }, [editor, hasHoveredEditor]);
 
@@ -271,32 +306,37 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
     setShowBlockMenu(false);
     if (!editor) return;
 
-    const chain = editor.chain().focus();
-    
-    switch(type) {
-      case "image":
-        chain.insertImageBlock({ src: "", caption: "" }).run();
-        break;
-      case "html":
-        chain.insertHtmlBlock({ html: "" }).run();
-        break;
-      case "divider":
-        chain.insertDivider().run();
-        break;
-      case "bookmark":
-        chain.insertBookmark({ url: "" }).run();
-        break;
-      case "youtube":
-        chain.insertYoutube({ url: "" }).run();
-        break;
-      case "unsplash":
-        chain.insertUnsplash({ src: "", author: "" }).run();
-        break;
-      case "twitter":
-        chain.insertTwitter({ url: "" }).run();
-        break;
-      default:
-        break;
+    try {
+      const chain = editor.chain().focus();
+      
+      switch(type) {
+        case "image":
+          chain.insertImageBlock({ src: "", caption: "" }).run();
+          break;
+        case "html":
+          chain.insertHtmlBlock({ html: "" }).run();
+          break;
+        case "divider":
+          chain.insertDivider().run();
+          break;
+        case "bookmark":
+          chain.insertBookmark({ url: "" }).run();
+          break;
+        case "youtube":
+          chain.insertYoutube({ url: "" }).run();
+          break;
+        case "unsplash":
+          chain.insertUnsplash({ src: "", author: "" }).run();
+          break;
+        case "twitter":
+          chain.insertTwitter({ url: "" }).run();
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error('Error inserting block:', error);
+      setEditorError(`Failed to insert ${type} block: ${error.message}`);
     }
   };
 
@@ -314,6 +354,35 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showBlockMenu]);
 
+  // FIX: Show error state if editor fails
+  if (editorError) {
+    return (
+      <div style={{ 
+        border: "1px solid #e5e7eb", 
+        padding: "20px", 
+        borderRadius: "8px",
+        background: "#fef2f2",
+        color: "#dc2626"
+      }}>
+        <h3>Editor Error</h3>
+        <p>{editorError}</p>
+        <button 
+          onClick={() => setEditorError(null)}
+          style={{
+            padding: "8px 16px",
+            background: "#dc2626",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            marginTop: "10px"
+          }}
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -321,7 +390,8 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
       onMouseEnter={() => setHasHoveredEditor(true)}
       style={{ position: "relative", minHeight: "400px" }}
     >
-        {editor && <BubbleMenu editor={editor} />}
+{editor && editor.isEditable && <BubbleMenu editor={editor} />}
+      
       {showPlus && !showBlockMenu && (
         <button
           ref={plusButtonRef}
@@ -330,7 +400,17 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
             position: "absolute", 
             top: (activeLineTop || 0) - 2, 
             left: -45, 
-            zIndex: 30 
+            zIndex: 30,
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: "4px",
+            padding: "8px",
+            cursor: "pointer",
+            width: "32px",
+            height: "32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
           }}
           onClick={() => setShowBlockMenu(true)}
         >
@@ -352,7 +432,17 @@ export default function RichTextEditor({ initialContent = "", onChange, onSaved 
         </div>
       )}
 
-      <EditorContent editor={editor} />
+      {editor ? (
+        <EditorContent editor={editor} />
+      ) : (
+        <div style={{ 
+          padding: "40px", 
+          textAlign: "center",
+          color: "#6b7280"
+        }}>
+          Loading editor...
+        </div>
+      )}
     </div>
   );
 }

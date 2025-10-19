@@ -16,57 +16,87 @@ export default function Editor() {
 
   const [title, setTitle] = useState("");
   const [cover, setCover] = useState(null);
-  const [draftStatus, setDraftStatus] = useState("New");
+  const [draftStatus, setDraftStatus] = useState(id ? "Loading..." : "New");
   const [content, setContent] = useState("");
+  const [isLoading, setIsLoading] = useState(!!id);
 
-  // Defensive: wait for posts to load if editing
-  const post = id ? posts.find((p) => p.id === id) : null;
-  if (id && !post) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center" }}>
-        <h2>Loading post...</h2>
-        <p>Please wait or go back to the Home page.</p>
-      </div>
-    );
-  }
+  console.log('Editor mounted with id:', id);
+  console.log('Available posts:', posts);
 
-  // Save
+  // Load post data for editing
+  useEffect(() => {
+    if (id) {
+      console.log('Loading post with id:', id);
+      const post = posts.find((p) => p.id === id);
+      
+      if (post) {
+        console.log('Post found:', post);
+        setTitle(post.title || "");
+        setContent(post.content || "");
+        setCover(post.featuredImage || null);
+        setDraftStatus("Saved");
+      } else {
+        console.warn('Post not found with id:', id);
+        setDraftStatus("New Post");
+      }
+      setIsLoading(false);
+    } else {
+      // New post - reset everything
+      console.log('Creating new post');
+      setTitle("");
+      setContent("");
+      setCover(null);
+      setDraftStatus("New");
+      setIsLoading(false);
+    }
+  }, [id, posts]);
+
+  // Save function
   const handleSave = useCallback(
     (contentToSave = content, featuredImage = cover) => {
+      console.log('Saving post...', { id, title, contentToSave });
+      
       const now = new Date().toISOString();
+      
       if (id) {
+        // Update existing post
         updatePost(id, {
           title,
           content: contentToSave,
           featuredImage,
           updatedAt: now,
         });
+        console.log('Post updated:', id);
+        setDraftStatus("Saved");
       } else {
+        // Create new post
         const newPost = {
           id: Date.now().toString(),
-          title,
+          title: title || "Untitled Post",
           content: contentToSave,
           featuredImage,
           createdAt: now,
           updatedAt: now,
         };
+        console.log('Creating new post:', newPost);
         addPost(newPost);
-        navigate(`/editor/${newPost.id}`);
+        setDraftStatus("Saved");
       }
-      setDraftStatus("Saved");
     },
-    [id, title, content, cover, addPost, updatePost, navigate]
+    [id, title, content, cover, addPost, updatePost]
   );
 
-  // Load post data
+  // Auto-save when content changes
   useEffect(() => {
-    if (post) {
-      setTitle(post.title || "");
-      setContent(post.content || "");
-      setDraftStatus("Saved");
-      setCover(post.featuredImage || null);
+    if ((content && content !== '<p></p>') || title) {
+      setDraftStatus("Saving...");
+      const timeoutId = setTimeout(() => {
+        handleSave(content, cover);
+      }, 1500);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [post]);
+  }, [content, title, cover, handleSave]);
 
   // Cover upload
   const handleCoverUpload = (e) => {
@@ -79,19 +109,50 @@ export default function Editor() {
     }
   };
 
+  // Handle publish
+  const handlePublish = () => {
+    handleSave();
+    alert('Post published!');
+  };
+
+  // FIXED: Simple back navigation
+  const handleBack = () => {
+    navigate("/home");
+  };
+
+  // Show loading state while fetching post data
+  if (isLoading) {
+    return (
+      <div className="editor-container container">
+        <div className="editor-header">
+          <div className="editor-left">
+            <button className="back-btn" onClick={handleBack}>
+              <AiOutlineLeft /> Posts
+            </button>
+            <span className="draft-status">Loading...</span>
+          </div>
+        </div>
+        <div className="loading-state">
+          <h2>Loading post...</h2>
+          <p>Please wait...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="editor-container container">
       {/* Header */}
       <div className="editor-header">
         <div className="editor-left">
-          <button className="back-btn" onClick={() => navigate("/home")}>
+          <button className="back-btn" onClick={handleBack}>
             <AiOutlineLeft /> Posts
           </button>
           <span className="draft-status">Draft - {draftStatus}</span>
         </div>
         <div className="editor-right">
           <button className="preview-btn">Preview</button>
-          <button className="publish-btn" onClick={() => handleSave(content)}>
+          <button className="publish-btn" onClick={handlePublish}>
             Publish
           </button>
         </div>
@@ -136,8 +197,10 @@ export default function Editor() {
 
       {/* Rich Text Editor */}
       <RichTextEditor
+        key={id || "new"}
         initialContent={content}
         onChange={(html) => {
+          console.log('Content changed:', html);
           setContent(html);
           setDraftStatus("Saving...");
         }}
